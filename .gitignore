@@ -9,6 +9,12 @@ venv/
 app/embeddings.json
 *.json
 
+# 참고용 예제 코드 (저장소에 올리지 않음)
+reference/
+
+# reference/rag_mini.py 실행 시 생기는 이력 파일
+*.jsonl
+
 # DB 파일
 *.db
 *.sqlite
