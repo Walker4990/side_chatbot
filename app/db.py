@@ -86,3 +86,25 @@ def get_unanswered():
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def create_user(username, password_hash, role) -> str:
+    id = uuid.uuid4().hex
+
+    conn = get_conn()
+    
+    conn.execute(
+        "INSERT INTO users (id, username, password_hash, role) VALUES (?,?,?,?)",
+        (id, username, password_hash, role)
+    )
+    conn.commit()
+    conn.close()
+    return id
+
+def get_user_by_username(username) -> dict | None:
+    conn = get_conn()
+
+    row = conn.execute(
+        "SELECT * FROM users where username = ?", (username,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
