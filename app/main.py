@@ -50,6 +50,9 @@ class CreateUserRequest(BaseModel):
     password: str
     role: str = "user"
 
+class StatusRequest(BaseModel):
+    status: str
+
 @app.post("/api/ask", response_model=AskResponse)
 def ask(req: AskRequest, user: dict = Depends(auth.get_current_user)):
     query = req.query.strip()
@@ -98,6 +101,16 @@ def admin_history(admin: dict = Depends(auth.require_admin)):
 @app.get("/api/admin/unanswered")
 def admin_unanswered(admin: dict = Depends(auth.require_admin)):
     return db.get_unanswered()
+
+
+# 미답변 처리 상태 변경: 문서를 보완했으면 resolved, 되돌리려면 pending
+@app.patch("/api/admin/unanswered/{unanswered_id}")
+def update_unanswered(unanswered_id: str, req: StatusRequest, admin: dict = Depends(auth.require_admin)):
+    if req.status not in ("pending", "resolved"):
+        raise HTTPException(status_code=400, detail="status는 pending 또는 resolved만 가능합니다.")
+    if not db.update_unanswered_status(unanswered_id, req.status):
+        raise HTTPException(status_code=404, detail="미답변 질문을 찾을 수 없습니다.")
+    return {"id": unanswered_id, "status": req.status}
 
 @app.get("/")
 def index():

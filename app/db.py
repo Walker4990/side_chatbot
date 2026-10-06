@@ -74,8 +74,13 @@ def save_unanswered(history_id, question, top_score, reason) -> str:
 def get_history():
     conn = get_conn()
 
+    # users와 JOIN해서 질문한 사람의 아이디(username)도 함께 가져온다
+    # LEFT JOIN: 로그인 기능 전에 쌓인 이력(user_id 없음)도 빠지지 않게
     rows = conn.execute(
-        "SELECT * FROM history ORDER BY created_at DESC"
+        """SELECT h.*, u.username
+           FROM history h
+           LEFT JOIN users u ON u.id = h.user_id
+           ORDER BY h.created_at DESC"""
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -88,6 +93,18 @@ def get_unanswered():
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def update_unanswered_status(unanswered_id: str, status: str) -> bool:
+    """미답변 처리 상태 변경 (pending ↔ resolved). 없는 id면 False"""
+    conn = get_conn()
+    cur = conn.execute(
+        "UPDATE unanswered SET status = %s WHERE id = %s",
+        (status, unanswered_id)
+    )
+    updated = cur.rowcount   # 실제로 바뀐 줄 수
+    conn.commit()
+    conn.close()
+    return updated > 0
 
 def create_user(username, password_hash, role) -> str:
     id = uuid.uuid4().hex
