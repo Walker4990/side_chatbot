@@ -62,6 +62,7 @@
                 <th>점수</th>
                 <th>사유</th>
                 <th>상태</th>
+                <th>처리</th>
               </tr>
             </thead>
             <tbody id="unansweredBody"></tbody>
@@ -166,6 +167,31 @@
         }
       }
 
+      // 미답변 처리 버튼: 대기 → "보완 완료", 보완 완료 → "대기로 되돌리기"
+      function statusButton(r) {
+        const td = document.createElement("td");
+        td.className = "nowrap";
+        const btn = document.createElement("button");
+        const next = r.status === "pending" ? "resolved" : "pending";
+        btn.className = "btn" + (next === "resolved" ? " primary" : "");
+        btn.textContent = next === "resolved" ? "보완 완료" : "대기로 되돌리기";
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            await api(`/api/admin/unanswered/${encodeURIComponent(r.id)}`, {
+              method: "PATCH",
+              body: { status: next },
+            });
+            loaders.unanswered();
+          } catch (err) {
+            alert("상태를 바꾸지 못했어요: " + err.message);
+            btn.disabled = false;
+          }
+        });
+        td.appendChild(btn);
+        return td;
+      }
+
       // ── 데이터 불러오기 ──
       const loaders = {
         async history() {
@@ -180,7 +206,7 @@
               const tr = document.createElement("tr");
               tr.append(
                 cell(r.created_at, "nowrap"),
-                cell(r.username || r.user_id || "-", "nowrap"), // username은 백엔드 JOIN 후 표시됨
+                cell(r.username || "-", "nowrap"), // 로그인 기능 전 이력은 사용자 없음
                 cell(r.question, "long"),
                 cell(r.answer, "long"),
                 cell(parseSources(r.sources)),
@@ -205,7 +231,7 @@
             const pending = rows.filter((r) => r.status === "pending").length;
             document.getElementById("unansweredCount").textContent =
               `총 ${rows.length}건 · 대기 ${pending}건`;
-            if (!rows.length) return emptyRow(body, 5, "미답변 질문이 없어요.");
+            if (!rows.length) return emptyRow(body, 6, "미답변 질문이 없어요.");
             for (const r of rows) {
               const tr = document.createElement("tr");
               tr.append(
@@ -219,12 +245,12 @@
                 r.status === "pending"
                   ? badge("대기", "warn")
                   : badge("보완 완료", "ok"),
-                // TODO: 상태 변경 API(PATCH /api/admin/unanswered/{id})가 생기면 여기에 "보완 완료" 버튼 추가
+                statusButton(r),
               );
               body.appendChild(tr);
             }
           } catch (err) {
-            emptyRow(body, 5, "불러오지 못했어요: " + err.message);
+            emptyRow(body, 6, "불러오지 못했어요: " + err.message);
           }
         },
 
