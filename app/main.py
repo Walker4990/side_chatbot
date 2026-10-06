@@ -73,7 +73,7 @@ def ask(req: AskRequest, user: dict = Depends(auth.get_current_user)):
 def create_user(req: CreateUserRequest, admin: dict = Depends(auth.require_admin)):
     
     if req.role not in ('admin', 'user'):
-        raise HTTPException(status_code=403, detail="권한은 user 혹은 admin을 선택해주세요.")
+        raise HTTPException(status_code=400, detail="권한은 user 혹은 admin을 선택해주세요.")
     check_username = db.get_user_by_username(req.username)
 
     if check_username is not None:

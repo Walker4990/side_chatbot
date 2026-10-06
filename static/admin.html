@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리자 · 사내 문서 챗봇</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="admin-page">
+<header>
+  <h1>관리자</h1>
+  <span class="who" id="who"></span>
+  <nav>
+    <a class="btn" href="/">채팅</a>
+    <button class="btn" id="logout">로그아웃</button>
+  </nav>
+</header>
+
+<main>
+  <div class="tabs" role="tablist">
+    <button class="active" data-tab="history">대화 이력</button>
+    <button data-tab="unanswered">미답변 질문</button>
+    <button data-tab="users">계정 추가</button>
+  </div>
+
+  <!-- 대화 이력 -->
+  <section data-panel="history">
+    <div class="toolbar">
+      <span class="count" id="historyCount"></span>
+      <button class="btn" data-reload="history">새로고침</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>시각</th><th>사용자</th><th>질문</th><th>답변</th><th>출처</th><th>점수</th><th>결과</th></tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 미답변 질문 -->
+  <section data-panel="unanswered" hidden>
+    <div class="toolbar">
+      <span class="count" id="unansweredCount"></span>
+      <button class="btn" data-reload="unanswered">새로고침</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>시각</th><th>질문</th><th>점수</th><th>사유</th><th>상태</th></tr>
+        </thead>
+        <tbody id="unansweredBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 계정 추가 -->
+  <section data-panel="users" hidden>
+    <form class="user-form" id="userForm">
+      <label>아이디 <input id="newUsername" required autocomplete="off"></label>
+      <label>비밀번호 <input id="newPassword" type="password" required autocomplete="new-password"></label>
+      <label>역할
+        <select id="newRole">
+          <option value="user">일반 사용자</option>
+          <option value="admin">관리자</option>
+        </select>
+      </label>
+      <button class="btn primary">계정 추가</button>
+    </form>
+    <div class="error" id="userError"></div>
+    <div class="muted" id="userResult" style="font-size:14px"></div>
+  </section>
+</main>
+
+<script src="/static/common.js"></script>
+<script>
+  if (Auth.require(true)) document.getElementById("who").textContent = Auth.username;
+  document.getElementById("logout").addEventListener("click", Auth.logout);
+
+  // ── 탭 전환 ──
+  const tabs = document.querySelectorAll(".tabs button");
+  tabs.forEach((tab) => tab.addEventListener("click", () => {
+    tabs.forEach((t) => t.classList.toggle("active", t === tab));
+    document.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+  }));
+  document.querySelectorAll("[data-reload]").forEach((b) =>
+    b.addEventListener("click", () => loaders[b.dataset.reload]()));
+
+  // ── 표 그리기 도우미 (textContent만 써서 질문 내용에 HTML이 있어도 안전) ──
+  function cell(text, cls) {
+    const td = document.createElement("td");
+    if (cls) td.className = cls;
+    td.textContent = text ?? "";
+    return td;
+  }
+  function badge(text, kind) {
+    const td = document.createElement("td");
+    const span = document.createElement("span");
+    span.className = "badge " + kind;
+    span.textContent = text;
+    td.appendChild(span);
+    return td;
+  }
+  function emptyRow(tbody, cols, text) {
+    const tr = document.createElement("tr");
+    const td = cell(text, "muted");
+    td.colSpan = cols;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+  function parseSources(s) {
+    try { return JSON.parse(s || "[]").join(", "); } catch { return s; }
+  }
+
+  // ── 데이터 불러오기 ──
+  const loaders = {
+    async history() {
+      const body = document.getElementById("historyBody");
+      body.replaceChildren();
+      try {
+        const rows = await api("/api/admin/history");
+        document.getElementById("historyCount").textContent = `총 ${rows.length}건`;
+        if (!rows.length) return emptyRow(body, 7, "아직 이력이 없어요.");
+        for (const r of rows) {
+          const tr = document.createElement("tr");
+          tr.append(
+            cell(r.created_at, "nowrap"),
+            cell(r.username || r.user_id || "-", "nowrap"),   // username은 백엔드 JOIN 후 표시됨
+            cell(r.question, "long"),
+            cell(r.answer, "long"),
+            cell(parseSources(r.sources)),
+            cell(r.top_score == null ? "" : Number(r.top_score).toFixed(3), "num"),
+            r.unanswerable ? badge("미답변", "warn") : badge("답변", "ok"),
+          );
+          body.appendChild(tr);
+        }
+      } catch (err) {
+        emptyRow(body, 7, "불러오지 못했어요: " + err.message);
+      }
+    },
+
+    async unanswered() {
+      const body = document.getElementById("unansweredBody");
+      body.replaceChildren();
+      try {
+        const rows = await api("/api/admin/unanswered");
+        const pending = rows.filter((r) => r.status === "pending").length;
+        document.getElementById("unansweredCount").textContent = `총 ${rows.length}건 · 대기 ${pending}건`;
+        if (!rows.length) return emptyRow(body, 5, "미답변 질문이 없어요.");
+        for (const r of rows) {
+          const tr = document.createElement("tr");
+          tr.append(
+            cell(r.created_at, "nowrap"),
+            cell(r.question, "long"),
+            cell(r.top_score == null ? "" : Number(r.top_score).toFixed(3), "num"),
+            cell(r.reason),
+            r.status === "pending" ? badge("대기", "warn") : badge("보완 완료", "ok"),
+            // TODO: 상태 변경 API(PATCH /api/admin/unanswered/{id})가 생기면 여기에 "보완 완료" 버튼 추가
+          );
+          body.appendChild(tr);
+        }
+      } catch (err) {
+        emptyRow(body, 5, "불러오지 못했어요: " + err.message);
+      }
+    },
+  };
+
+  // ── 계정 추가 ──
+  document.getElementById("userForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById("userError");
+    const resultBox = document.getElementById("userResult");
+    errorBox.textContent = "";
+    resultBox.textContent = "";
+    const body = {
+      username: document.getElementById("newUsername").value.trim(),
+      password: document.getElementById("newPassword").value,
+      role: document.getElementById("newRole").value,
+    };
+    try {
+      const r = await api("/api/admin/users", { method: "POST", body });
+      resultBox.textContent = `계정을 만들었어요: ${r.username} (${r.role === "admin" ? "관리자" : "일반 사용자"})`;
+      e.target.reset();
+    } catch (err) {
+      errorBox.textContent = err.message;
+    }
+  });
+
+  loaders.history();
+  loaders.unanswered();
+</script>
+</body>
+</html>

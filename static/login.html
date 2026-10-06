@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 · 사내 문서 챗봇</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <form class="login-card" id="form">
+    <h1>사내 문서 챗봇</h1>
+    <p class="muted" style="margin:0 0 8px;font-size:14px">관리자에게 발급받은 계정으로 로그인하세요.</p>
+    <label>아이디
+      <input id="username" autocomplete="username" required autofocus>
+    </label>
+    <label>비밀번호
+      <input id="password" type="password" autocomplete="current-password" required>
+    </label>
+    <div class="error" id="error"></div>
+    <button class="btn primary" id="submit">로그인</button>
+  </form>
+</div>
+<script src="/static/common.js"></script>
+<script>
+  // 이미 로그인돼 있으면 바로 채팅 화면으로
+  if (Auth.token) location.href = "/";
+
+  const form = document.getElementById("form");
+  const errorBox = document.getElementById("error");
+  const submit = document.getElementById("submit");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.textContent = "";
+    submit.disabled = true;
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+    try {
+      const r = await api("/api/login", { method: "POST", body: { username, password } });
+      Auth.save(r.access_token, r.role, username);
+      location.href = r.role === "admin" ? "/static/admin.html" : "/";
+    } catch (err) {
+      errorBox.textContent = err.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
