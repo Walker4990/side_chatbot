@@ -8,8 +8,8 @@ fastapi
 uvicorn[standard]
 
 # 5단계 (로그인) - 필요할 때 설치
-# bcrypt
-# PyJWT
+bcrypt
+PyJWT
 
 # 실제 문서 처리 - 필요할 때 설치
 # pypdf
