@@ -116,4 +116,8 @@ def login(req: LoginRequest):
     # 힌트: 3) 맞으면 auth.create_token(user)로 토큰 만들기
     # 힌트: 4) return {"access_token": 토큰, "token_type": "bearer", "role": user["role"]}
 
+
+@app.get("/api/admin/users_list")
+def user_list(admin: dict = Depends(auth.require_admin)):
+    return db.get_user_list()
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

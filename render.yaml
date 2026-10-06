@@ -1,0 +1,30 @@
+# Render 배포 설정 (Blueprint)
+# Render 대시보드 → New → Blueprint → 이 저장소 선택 → sync: false 항목은 값을 직접 입력
+services:
+  - type: web
+    name: side-chatbot
+    runtime: python
+    plan: free
+    region: singapore          # 한국에서 가장 가까운 Render 지역 (Supabase는 서울)
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      # 비밀값: 저장소에 넣지 않고 Render 화면에서 입력
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      # JWT 서명 키: Render가 무작위로 생성 (로컬 .env 값과 달라도 됨)
+      - key: JWT_SECRET
+        generateValue: true
+      # 일반 설정 (.env.example과 같은 값)
+      - key: CHAT_MODEL
+        value: gpt-4o-mini
+      - key: EMBED_MODEL
+        value: text-embedding-3-small
+      - key: SIMILARITY_THRESHOLD
+        value: "0.27"
+      - key: TOP_K
+        value: "3"
