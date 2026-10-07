@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>로그인 · 사내 문서 챗봇</title>
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/common.js"></script>
+<script>
+  // 이미 로그인돼 있으면(토큰이 살아 있으면) 로그인 화면을 건너뜀
+  if (Auth.isLoggedIn()) location.replace(Auth.role === "admin" ? "/static/admin.html" : "/");
+</script>
 </head>
 <body>
 <div class="login-wrap">
@@ -21,11 +26,7 @@
     <button class="btn primary" id="submit">로그인</button>
   </form>
 </div>
-<script src="/static/common.js"></script>
 <script>
-  // 이미 로그인돼 있으면 바로 채팅 화면으로
-  if (Auth.token) location.href = "/";
-
   const form = document.getElementById("form");
   const errorBox = document.getElementById("error");
   const submit = document.getElementById("submit");

@@ -20,13 +20,34 @@ const Auth = {
 
   logout() {
     Auth.clear();
-    location.href = "/static/login.html";
+    location.replace("/static/login.html");
   },
 
-  // 로그인이 안 돼 있으면 로그인 화면으로. adminOnly면 관리자만 통과
+  // 토큰이 있고 만료되지 않았는지 확인
+  // JWT 가운데 부분(payload)은 누구나 읽을 수 있어서 exp(만료 시각)를 화면에서 바로 확인 가능
+  // (위조 여부는 서버가 검사하므로 여기서는 "만료됐는지"만 본다)
+  isLoggedIn() {
+    const token = Auth.token;
+    if (!token) return false;
+    try {
+      const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const { exp } = JSON.parse(atob(payload));
+      return exp * 1000 > Date.now();
+    } catch {
+      return false;
+    }
+  },
+
+  // 로그인이 안 돼 있으면(또는 만료면) 로그인 화면으로. adminOnly면 관리자만 통과
+  // <head>에서 호출하면 화면이 그려지기 전에 이동해서 다른 화면이 잠깐 보이지 않음
+  // location.replace: 뒤로 가기를 눌러도 보호된 화면으로 돌아오지 않게
   require(adminOnly = false) {
-    if (!Auth.token) { location.href = "/static/login.html"; return false; }
-    if (adminOnly && Auth.role !== "admin") { location.href = "/"; return false; }
+    if (!Auth.isLoggedIn()) {
+      Auth.clear();
+      location.replace("/static/login.html");
+      return false;
+    }
+    if (adminOnly && Auth.role !== "admin") { location.replace("/"); return false; }
     return true;
   },
 };
