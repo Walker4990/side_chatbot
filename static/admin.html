@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>관리자 · 사내 문서 챗봇</title>
     <link rel="stylesheet" href="/static/style.css" />
+    <!-- 화면을 그리기 전에 로그인·관리자 확인 -->
+    <script src="/static/common.js"></script>
+    <script>Auth.require(true);</script>
   </head>
   <body class="admin-page">
     <header>
@@ -115,7 +118,6 @@
       </section>
     </main>
 
-    <script src="/static/common.js"></script>
     <script>
       if (Auth.require(true))
         document.getElementById("who").textContent = Auth.username;
