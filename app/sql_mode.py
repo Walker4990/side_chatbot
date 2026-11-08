@@ -39,8 +39,13 @@ class SqlResponse(BaseModel):
 
 
 def ask_sql(
-    query: str, user_id: str, service: TextToSqlService, save_history: SaveHistory
+    query: str, user_id: str, service: TextToSqlService | None, save_history: SaveHistory
 ) -> SqlResponse:
+    # 시작할 때 SQL 서비스를 못 만들었으면(설정·메타데이터 오류) SQL 모드만 끄고 문서 모드는 계속 쓴다
+    if service is None:
+        raise HTTPException(
+            status_code=503, detail="SQL 모드를 지금 사용할 수 없습니다. 관리자에게 문의하세요."
+        )
     query = query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="질문을 입력하세요.")
@@ -67,7 +72,9 @@ def ask_sql(
 
     unsupported = result.status == "unsupported"
     answer = (result.message if unsupported else result.rendered_sql) or ""
-    save_history(user_id, query, answer, [], 0.0, unsupported, mode="sql")
+    if unsupported:
+        logger.info("SQL 모드 거절 requestId=%s reason=%s", request_id, result.message)
+    save_history(user_id, query, answer, [], 0.0, unsupported, mode="sql", request_id=request_id)
 
     return SqlResponse.model_validate(
         {

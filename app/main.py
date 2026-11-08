@@ -3,6 +3,7 @@
 실행: (side_chatbot 루트에서) uvicorn app.main:app --reload
 접속: http://127.0.0.1:8000
 """
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,9 +12,16 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from text_to_sql.config import load_settings
+from text_to_sql.errors import ConfigError, MetadataError
 from text_to_sql.factory import create_service
 
 from app import rag, db, auth, sql_mode
+
+# 우리 코드(app, text_to_sql)의 INFO 로그도 Render 로그에 남기기 위한 설정
+# (uvicorn 자체 로그는 uvicorn이 따로 설정하므로 겹치지 않는다)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)  # 요청마다 찍히는 HTTP 로그는 줄인다
+logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
@@ -29,7 +37,12 @@ async def lifespan(app: FastAPI):
     db.init_db()
     state["chunks"] = rag.build_or_load_embeddings(rag.load_chunks())
     # .env는 위의 rag·db import 때 이미 읽혔다 (load_dotenv). OPENAI_API_KEY를 같이 쓴다
-    state["sql_service"] = create_service(load_settings())
+    # SQL 서비스 준비가 실패해도 문서 모드는 동작하도록, 오류를 로그로 남기고 SQL 모드만 끈다
+    try:
+        state["sql_service"] = create_service(load_settings())
+    except (ConfigError, MetadataError):
+        logger.exception("SQL 모드를 시작하지 못했습니다. /api/sql은 503을 돌려줍니다")
+        state["sql_service"] = None
     yield
 
 

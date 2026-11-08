@@ -43,18 +43,20 @@ def init_db() :
         );
         -- 질문 모드: 'doc'(문서 RAG) / 'sql'(Text-to-SQL). 기존 행은 기본값 'doc'로 채워진다
         ALTER TABLE history ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'doc';
+        -- 요청 추적 ID (SQL 모드 응답·서버 로그와 같은 값). 문서 질문과 기존 행은 비어 있다
+        ALTER TABLE history ADD COLUMN IF NOT EXISTS request_id TEXT;
     """)
     conn.commit()
     conn.close()
 
-def save_history(user_id, question, answer, sources, top_score, unanswerable, mode="doc") -> str:
+def save_history(user_id, question, answer, sources, top_score, unanswerable, mode="doc", request_id=None) -> str:
     id = uuid.uuid4().hex
 
     conn = get_conn()
 
     conn.execute(
-        "INSERT INTO history (id, user_id, question, answer, sources, top_score, unanswerable, mode) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-        (id, user_id, question, answer, json.dumps(sources, ensure_ascii=False), top_score, int(unanswerable), mode)
+        "INSERT INTO history (id, user_id, question, answer, sources, top_score, unanswerable, mode, request_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (id, user_id, question, answer, json.dumps(sources, ensure_ascii=False), top_score, int(unanswerable), mode, request_id)
     )
     conn.commit()
     conn.close()
