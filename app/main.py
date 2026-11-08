@@ -3,6 +3,7 @@
 실행: (side_chatbot 루트에서) uvicorn app.main:app --reload
 접속: http://127.0.0.1:8000
 """
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -10,12 +11,23 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from app import rag, db, auth
+from text_to_sql.config import load_settings
+from text_to_sql.errors import ConfigError, MetadataError
+from text_to_sql.factory import create_service
+
+from app import rag, db, auth, sql_mode
+
+# 우리 코드(app, text_to_sql)의 INFO 로그도 Render 로그에 남기기 위한 설정
+# (uvicorn 자체 로그는 uvicorn이 따로 설정하므로 겹치지 않는다)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)  # 요청마다 찍히는 HTTP 로그는 줄인다
+logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
 # 서버가 켜질 때 한 번만 문서를 읽고 임베딩을 준비해 둔다
-state = {"chunks": []}
+# sql_service: Text-to-SQL 서비스 (켜질 때 한 번 만들어 계속 쓴다)
+state = {"chunks": [], "sql_service": None}
 
 
 
@@ -24,6 +36,13 @@ state = {"chunks": []}
 async def lifespan(app: FastAPI):
     db.init_db()
     state["chunks"] = rag.build_or_load_embeddings(rag.load_chunks())
+    # .env는 위의 rag·db import 때 이미 읽혔다 (load_dotenv). OPENAI_API_KEY를 같이 쓴다
+    # SQL 서비스 준비가 실패해도 문서 모드는 동작하도록, 오류를 로그로 남기고 SQL 모드만 끈다
+    try:
+        state["sql_service"] = create_service(load_settings())
+    except (ConfigError, MetadataError):
+        logger.exception("SQL 모드를 시작하지 못했습니다. /api/sql은 503을 돌려줍니다")
+        state["sql_service"] = None
     yield
 
 
@@ -70,6 +89,12 @@ def ask(req: AskRequest, user: dict = Depends(auth.get_current_user)):
         db.save_unanswered(history_id, query, result["top_score"], result["reason"])
 
     return result
+
+
+# SQL 모드: 질문 → 상품 DB 조회 SQL (LLM은 의도만 뽑고 SQL은 템플릿으로 조립)
+@app.post("/api/sql", response_model=sql_mode.SqlResponse)
+def ask_sql(req: sql_mode.SqlRequest, user: dict = Depends(auth.get_current_user)):
+    return sql_mode.ask_sql(req.query, user["id"], state["sql_service"], db.save_history)
 
 
 @app.post("/api/admin/users")

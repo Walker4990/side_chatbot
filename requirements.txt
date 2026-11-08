@@ -17,3 +17,7 @@ PyJWT
 
 # DB (Supabase PostgreSQL)
 psycopg[binary]
+
+# SQL 모드 (Text-to-SQL 코어, 별도 저장소). main 브랜치 최신을 설치한다
+# 로컬 개발: pip install -e C:\Users\bora0\text-to-sql (코드 수정이 바로 반영됨)
+text-to-sql @ git+https://github.com/Walker4990/text-to-sql.git@main
