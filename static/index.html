@@ -20,9 +20,14 @@
     </nav>
   </header>
   <div id="log">
-    <div class="msg bot">등록된 문서 내용만 근거로 답해요. 문서에 없으면 답하지 않고 기록해 둬요.</div>
+    <div class="msg bot">문서 모드: 등록된 문서 내용만 근거로 답해요. 문서에 없으면 답하지 않고 기록해 둬요.
+SQL 모드: 상품 DB 조회 SQL을 만들어 드려요. (예: "OF001 오퍼링에 연결된 하위 오브젝트")</div>
   </div>
   <form class="chat-form" id="form">
+    <div class="mode-toggle" role="group" aria-label="질문 모드">
+      <button type="button" data-mode="doc" aria-pressed="true">문서</button>
+      <button type="button" data-mode="sql" aria-pressed="false">SQL</button>
+    </div>
     <input id="q" autocomplete="off" placeholder="질문을 입력하세요" autofocus>
     <button class="btn primary" id="send">보내기</button>
   </form>
@@ -48,6 +53,97 @@
     return div;
   }
 
+  function addMeta(bubble, text) {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = text;
+    bubble.appendChild(meta);
+  }
+
+  // ── 질문 모드: 문서(RAG) / SQL(Text-to-SQL). 마지막 선택은 이 브라우저에 기억 ──
+  const PLACEHOLDER = {
+    doc: "질문을 입력하세요",
+    sql: "예: OF001 오퍼링에 연결된 하위 오브젝트 알려줘",
+  };
+  let mode = "doc";
+  try { if (localStorage.getItem("chatMode") === "sql") mode = "sql"; } catch {}
+
+  function setMode(next) {
+    mode = next;
+    for (const b of document.querySelectorAll(".mode-toggle button")) {
+      const on = b.dataset.mode === mode;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    }
+    input.placeholder = PLACEHOLDER[mode];
+    try { localStorage.setItem("chatMode", mode); } catch {}
+  }
+  for (const b of document.querySelectorAll(".mode-toggle button")) {
+    b.addEventListener("click", () => { setMode(b.dataset.mode); input.focus(); });
+  }
+  setMode(mode);
+
+  // 화면 표시용 줄바꿈 (FROM·JOIN·WHERE·AND·ORDER BY 앞에서). 복사해도 그대로 실행되는 SQL이다
+  function prettySql(sql) {
+    return sql.trim().replace(/\s+(FROM|JOIN|WHERE|AND|ORDER BY)\s+/g, "\n$1 ");
+  }
+
+  function copyButton(getText) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = "복사";
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(getText());
+        btn.textContent = "복사됨";
+      } catch {
+        btn.textContent = "복사 실패";
+      }
+      setTimeout(() => { btn.textContent = "복사"; }, 1500);
+    });
+    return btn;
+  }
+
+  function showDocAnswer(bubble, r) {
+    bubble.textContent = r.answer;
+    if (r.unanswerable) bubble.classList.add("none");
+    addMeta(bubble, r.unanswerable
+      ? `미답변으로 기록됨 · 최고 점수 ${r.top_score.toFixed(3)}`
+      : `출처: ${r.sources.join(", ")} · 최고 점수 ${r.top_score.toFixed(3)}`);
+  }
+
+  function showSqlAnswer(bubble, r) {
+    if (r.status !== "ok") {
+      bubble.textContent = "지원하지 않는 질문이에요: " + (r.message || "");
+      bubble.classList.add("none");
+      addMeta(bubble, `requestId ${r.request_id}`);
+      return;
+    }
+    bubble.textContent = "SQL을 만들었어요. 값이 채워져 있어서 DB 도구에 바로 붙여 넣어 실행할 수 있어요.";
+    const block = document.createElement("div");
+    block.className = "sql-block";
+
+    const pre = document.createElement("pre");
+    pre.textContent = prettySql(r.rendered_sql);
+    const row = document.createElement("div");
+    row.className = "row";
+    row.appendChild(copyButton(() => pre.textContent));
+    block.append(pre, row);
+
+    // 바인드 변수 버전 (애플리케이션 코드에 넣을 때 사용)
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "바인드 변수 SQL 보기";
+    const pre2 = document.createElement("pre");
+    pre2.textContent = prettySql(r.sql) + "\n\n-- params\n" + JSON.stringify(r.params, null, 2);
+    details.append(summary, pre2);
+    block.appendChild(details);
+
+    bubble.appendChild(block);
+    addMeta(bubble, `requestId ${r.request_id}`);
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const query = input.value.trim();
@@ -55,22 +151,20 @@
     add(query, "me");
     input.value = "";
     send.disabled = true;
-    const bubble = add("답변을 찾는 중...", "bot");
+    const askMode = mode;  // 응답을 기다리는 동안 토글을 바꿔도 보낸 모드로 표시
+    const bubble = add(askMode === "sql" ? "SQL을 만드는 중..." : "답변을 찾는 중...", "bot");
     try {
-      const r = await api("/api/ask", { method: "POST", body: { query } });
-      bubble.textContent = r.answer;
-      if (r.unanswerable) bubble.classList.add("none");
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.textContent = r.unanswerable
-        ? `미답변으로 기록됨 · 최고 점수 ${r.top_score.toFixed(3)}`
-        : `출처: ${r.sources.join(", ")} · 최고 점수 ${r.top_score.toFixed(3)}`;
-      bubble.appendChild(meta);
+      if (askMode === "sql") {
+        showSqlAnswer(bubble, await api("/api/sql", { method: "POST", body: { query } }));
+      } else {
+        showDocAnswer(bubble, await api("/api/ask", { method: "POST", body: { query } }));
+      }
     } catch (err) {
       bubble.textContent = "오류가 발생했어요: " + err.message;
       bubble.classList.add("none");
     } finally {
       send.disabled = false;
+      log.scrollTop = log.scrollHeight;
       input.focus();
     }
   });

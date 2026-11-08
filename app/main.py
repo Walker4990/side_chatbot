@@ -10,12 +10,16 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from app import rag, db, auth
+from text_to_sql.config import load_settings
+from text_to_sql.factory import create_service
+
+from app import rag, db, auth, sql_mode
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
 # 서버가 켜질 때 한 번만 문서를 읽고 임베딩을 준비해 둔다
-state = {"chunks": []}
+# sql_service: Text-to-SQL 서비스 (켜질 때 한 번 만들어 계속 쓴다)
+state = {"chunks": [], "sql_service": None}
 
 
 
@@ -24,6 +28,8 @@ state = {"chunks": []}
 async def lifespan(app: FastAPI):
     db.init_db()
     state["chunks"] = rag.build_or_load_embeddings(rag.load_chunks())
+    # .env는 위의 rag·db import 때 이미 읽혔다 (load_dotenv). OPENAI_API_KEY를 같이 쓴다
+    state["sql_service"] = create_service(load_settings())
     yield
 
 
@@ -70,6 +76,12 @@ def ask(req: AskRequest, user: dict = Depends(auth.get_current_user)):
         db.save_unanswered(history_id, query, result["top_score"], result["reason"])
 
     return result
+
+
+# SQL 모드: 질문 → 상품 DB 조회 SQL (LLM은 의도만 뽑고 SQL은 템플릿으로 조립)
+@app.post("/api/sql", response_model=sql_mode.SqlResponse)
+def ask_sql(req: sql_mode.SqlRequest, user: dict = Depends(auth.get_current_user)):
+    return sql_mode.ask_sql(req.query, user["id"], state["sql_service"], db.save_history)
 
 
 @app.post("/api/admin/users")

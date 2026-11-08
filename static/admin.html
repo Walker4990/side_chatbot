@@ -38,6 +38,7 @@
               <tr>
                 <th>시각</th>
                 <th>사용자</th>
+                <th>모드</th>
                 <th>질문</th>
                 <th>답변</th>
                 <th>출처</th>
@@ -203,12 +204,13 @@
             const rows = await api("/api/admin/history");
             document.getElementById("historyCount").textContent =
               `총 ${rows.length}건`;
-            if (!rows.length) return emptyRow(body, 7, "아직 이력이 없어요.");
+            if (!rows.length) return emptyRow(body, 8, "아직 이력이 없어요.");
             for (const r of rows) {
               const tr = document.createElement("tr");
               tr.append(
                 cell(r.created_at, "nowrap"),
                 cell(r.username || "-", "nowrap"), // 로그인 기능 전 이력은 사용자 없음
+                cell(r.mode === "sql" ? "SQL" : "문서", "nowrap"), // mode 컬럼 추가 전 이력은 문서
                 cell(r.question, "long"),
                 cell(r.answer, "long"),
                 cell(parseSources(r.sources)),
@@ -221,7 +223,7 @@
               body.appendChild(tr);
             }
           } catch (err) {
-            emptyRow(body, 7, "불러오지 못했어요: " + err.message);
+            emptyRow(body, 8, "불러오지 못했어요: " + err.message);
           }
         },
 

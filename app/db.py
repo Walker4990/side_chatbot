@@ -41,18 +41,20 @@ def init_db() :
             status TEXT DEFAULT ('pending'),
             created_at TIMESTAMP(0) DEFAULT (now() AT TIME ZONE 'Asia/Seoul')
         );
+        -- 질문 모드: 'doc'(문서 RAG) / 'sql'(Text-to-SQL). 기존 행은 기본값 'doc'로 채워진다
+        ALTER TABLE history ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'doc';
     """)
     conn.commit()
     conn.close()
 
-def save_history(user_id, question, answer, sources, top_score, unanswerable) -> str:
+def save_history(user_id, question, answer, sources, top_score, unanswerable, mode="doc") -> str:
     id = uuid.uuid4().hex
-    
+
     conn = get_conn()
 
     conn.execute(
-        "INSERT INTO history (id, user_id, question, answer, sources, top_score, unanswerable) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-        (id, user_id, question, answer, json.dumps(sources, ensure_ascii=False), top_score, int(unanswerable))
+        "INSERT INTO history (id, user_id, question, answer, sources, top_score, unanswerable, mode) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+        (id, user_id, question, answer, json.dumps(sources, ensure_ascii=False), top_score, int(unanswerable), mode)
     )
     conn.commit()
     conn.close()

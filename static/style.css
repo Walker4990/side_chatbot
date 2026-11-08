@@ -70,6 +70,24 @@ input, select {
 .chat-form {
   display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--panel);
 }
+.chat-form input { flex: 1; min-width: 0; }
+
+/* 질문 모드 전환 (문서 / SQL) */
+.mode-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.mode-toggle button {
+  border: 0; background: transparent; color: var(--muted); padding: 0 12px; cursor: pointer; white-space: nowrap;
+}
+.mode-toggle button.active { background: var(--accent); color: var(--accent-text); }
+
+/* SQL 답변 */
+.sql-block { margin-top: 8px; }
+.sql-block pre {
+  margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line);
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; word-break: break-all;
+}
+.sql-block .row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.sql-block details { margin-top: 8px; font-size: 13px; }
+.sql-block summary { cursor: pointer; color: var(--muted); }
 
 /* ── 관리자 ── */
 .admin-page main { padding: 16px; max-width: 1200px; margin: 0 auto; }
