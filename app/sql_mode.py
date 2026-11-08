@@ -33,7 +33,7 @@ class SqlResponse(BaseModel):
     request_id: str
     status: str  # "ok" 또는 "unsupported"
     sql: str | None  # 바인드 변수 SQL (:code)
-    rendered_sql: str | None  # 값을 채운 복사용 SQL ('OF001')
+    rendered_sql: str | None  # 값을 채운 복사용 SQL ('RD001')
     params: dict[str, str | int]
     message: str | None  # unsupported일 때 사유
 

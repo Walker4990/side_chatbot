@@ -21,7 +21,7 @@
   </header>
   <div id="log">
     <div class="msg bot">문서 모드: 등록된 문서 내용만 근거로 답해요. 문서에 없으면 답하지 않고 기록해 둬요.
-SQL 모드: 상품 DB 조회 SQL을 만들어 드려요. (예: "OF001 오퍼링에 연결된 하위 오브젝트")</div>
+SQL 모드: 상품 DB 조회 SQL을 만들어 드려요. (예: "CRD001 카드에 연결된 부가서비스", "라이더 목록 보여줘")</div>
   </div>
   <form class="chat-form" id="form">
     <div class="mode-toggle" role="group" aria-label="질문 모드">
@@ -63,7 +63,7 @@ SQL 모드: 상품 DB 조회 SQL을 만들어 드려요. (예: "OF001 오퍼링�
   // ── 질문 모드: 문서(RAG) / SQL(Text-to-SQL). 마지막 선택은 이 브라우저에 기억 ──
   const PLACEHOLDER = {
     doc: "질문을 입력하세요",
-    sql: "예: OF001 오퍼링에 연결된 하위 오브젝트 알려줘",
+    sql: "예: INS001 보험상품에 연결된 특약 알려줘",
   };
   let mode = "doc";
   try { if (localStorage.getItem("chatMode") === "sql") mode = "sql"; } catch {}
