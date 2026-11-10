@@ -113,6 +113,16 @@ def create_user(req: CreateUserRequest, admin: dict = Depends(auth.require_admin
 
     return {"id": new_id, "username":req.username, "role": req.role}
 
+# 화면에 다시 불러오는 대화 기간(일). 오래된 기록까지 불러오면 느려진다 (기록 자체는 DB에 남는다)
+HISTORY_DAYS = 14
+
+
+# 로그인한 사용자 본인의 최근 대화. 새로고침해도 대화가 이어지도록 화면이 처음에 불러온다
+@app.get("/api/history/me")
+def my_history(user: dict = Depends(auth.get_current_user)):
+    return db.get_recent_history(user["id"], HISTORY_DAYS)
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "chunks": len(state["chunks"])}

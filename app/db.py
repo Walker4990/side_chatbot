@@ -89,6 +89,30 @@ def get_history():
     conn.close()
     return [dict(row) for row in rows]
 
+# 본인의 최근 대화 (새로고침해도 화면에 다시 그리기 위해 사용)
+# 오래 쓰면 이력이 쌓여 느려지므로 최근 days일, 최대 limit건만 불러온다
+def get_recent_history(user_id, days=14, limit=200):
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT question, answer, sources, top_score, unanswerable, mode, created_at
+           FROM history
+           WHERE user_id = %s
+             AND created_at >= (now() AT TIME ZONE 'Asia/Seoul') - %s * INTERVAL '1 day'
+           ORDER BY created_at DESC
+           LIMIT %s""",
+        (user_id, days, limit)
+    ).fetchall()
+    conn.close()
+
+    # 최신 limit건을 가져온 뒤, 화면에는 오래된 것부터 그리도록 뒤집는다
+    result = []
+    for row in reversed(rows):
+        item = dict(row)
+        item["sources"] = json.loads(item["sources"] or "[]")
+        item["unanswerable"] = bool(item["unanswerable"])
+        result.append(item)
+    return result
+
 def get_unanswered():
     conn = get_conn()
 

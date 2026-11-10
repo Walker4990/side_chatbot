@@ -136,6 +136,37 @@ SQL 모드: 상품 DB 조회 SQL을 만들어 드려요. 예를 들면
     bubble.appendChild(block);
   }
 
+  // ── 새로고침해도 대화가 이어지도록 최근 2주 대화를 서버 이력에서 불러와 다시 그린다 ──
+  async function loadHistory() {
+    try {
+      const items = await api("/api/history/me");
+      for (const h of items) {
+        add(h.question, "me");
+        const bubble = add("", "bot");
+        if (h.mode === "sql") {
+          // 이력에는 복사용 SQL(정상) 또는 거절 사유(미답변)가 answer에 저장되어 있다
+          showSqlAnswer(bubble, {
+            status: h.unanswerable ? "unsupported" : "ok",
+            rendered_sql: h.answer,
+            message: h.answer,
+          });
+        } else {
+          showDocAnswer(bubble, {
+            answer: h.answer,
+            unanswerable: h.unanswerable,
+            sources: h.sources,
+            top_score: h.top_score ?? 0,
+          });
+        }
+      }
+    } catch (err) {
+      const bubble = add("이전 대화를 불러오지 못했어요: " + err.message, "bot");
+      bubble.classList.add("none");
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+  if (Auth.token) loadHistory();
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const query = input.value.trim();
