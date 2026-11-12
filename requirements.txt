@@ -1,21 +1,17 @@
-# 0~1단계
-openai
+# 문서 모드(RAG): Ollama HTTP 호출, 벡터 계산
+httpx
 numpy
 python-dotenv
 
-# 4단계 (서버)
+# 웹 서버
 fastapi
 uvicorn[standard]
 
-# 5단계 (로그인) - 필요할 때 설치
+# 로그인 (비밀번호 해시, JWT)
 bcrypt
 PyJWT
 
-# 실제 문서 처리 - 필요할 때 설치
-# pypdf
-# python-docx
-
-# DB (Supabase PostgreSQL)
+# DB (PostgreSQL)
 psycopg[binary]
 
 # SQL 모드 (Text-to-SQL 코어, 별도 저장소). main 브랜치 최신을 설치한다

@@ -1,6 +1,6 @@
-"""웹 서버 (4단계)
+"""웹 서버: 문서 모드(RAG)와 SQL 모드 API, 로그인·관리자 화면
 
-실행: (side_chatbot 루트에서) uvicorn app.main:app --reload
+실행: (챗봇 루트에서) uvicorn app.main:app --reload
 접속: http://127.0.0.1:8000
 """
 import logging
@@ -13,11 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from text_to_sql.config import load_settings
 from text_to_sql.errors import ConfigError, MetadataError
-from text_to_sql.factory import create_service
+from text_to_sql.factory import create_service, start_warm_up
 
 from app import rag, db, auth, sql_mode
 
-# 우리 코드(app, text_to_sql)의 INFO 로그도 Render 로그에 남기기 위한 설정
+# 우리 코드(app, text_to_sql)의 INFO 로그도 서버 로그에 남기기 위한 설정
 # (uvicorn 자체 로그는 uvicorn이 따로 설정하므로 겹치지 않는다)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)  # 요청마다 찍히는 HTTP 로그는 줄인다
@@ -36,13 +36,16 @@ state = {"chunks": [], "sql_service": None}
 async def lifespan(app: FastAPI):
     db.init_db()
     state["chunks"] = rag.build_or_load_embeddings(rag.load_chunks())
-    # .env는 위의 rag·db import 때 이미 읽혔다 (load_dotenv). OPENAI_API_KEY를 같이 쓴다
+    # .env는 위의 rag·db import 때 이미 읽혔다 (load_dotenv). SQL 모드는 로컬 Ollama를 쓴다 (TTS_OLLAMA_*)
     # SQL 서비스 준비가 실패해도 문서 모드는 동작하도록, 오류를 로그로 남기고 SQL 모드만 끈다
     try:
         state["sql_service"] = create_service(load_settings())
     except (ConfigError, MetadataError):
         logger.exception("SQL 모드를 시작하지 못했습니다. /api/sql은 503을 돌려줍니다")
         state["sql_service"] = None
+    else:
+        # 첫 SQL 질문이 1분 가까이 걸리지 않도록 Ollama를 백그라운드에서 미리 데운다
+        start_warm_up(state["sql_service"])
     yield
 
 
@@ -80,7 +83,7 @@ def ask(req: AskRequest, user: dict = Depends(auth.get_current_user)):
     result = rag.ask(query, state["chunks"])
     result["top_score"] = float(result["top_score"])
 
-    # 모든 질문은 이력에 저장 (user_id는 5단계 로그인 전까지 None)
+    # 모든 질문은 이력에 저장
     history_id = db.save_history(
         user["id"], query, result["answer"], result["sources"], result["top_score"], result["unanswerable"]
     )
@@ -153,16 +156,12 @@ def index():
 
 @app.post("/api/login")
 def login(req: LoginRequest):
-    # 힌트: 1) db.get_user_by_username(req.username)으로 사용자 찾기
-    # 힌트: 2) 사용자가 없거나, auth.verify_password(...)가 False면
-    #          raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 틀렸습니다.")
+    # 아이디가 없거나 비밀번호가 틀리면 401 (어느 쪽이 틀렸는지는 알려 주지 않는다)
     check_user = db.get_user_by_username(req.username)
     if check_user is None or not auth.verify_password(req.password, check_user["password_hash"]):
         raise HTTPException(status_code = 401, detail="아이디 또는 비밀번호가 틀렸습니다.")
     token = auth.create_token(check_user)
     return {"access_token": token,"token_type": "bearer", "role": check_user["role"]}
-    # 힌트: 3) 맞으면 auth.create_token(user)로 토큰 만들기
-    # 힌트: 4) return {"access_token": 토큰, "token_type": "bearer", "role": user["role"]}
 
 
 @app.get("/api/admin/users_list")
