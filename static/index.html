@@ -87,10 +87,6 @@ SQL 모드: 상품 DB 조회 SQL을 만들어 드려요. 예를 들면
   }
   setMode(mode);
 
-  // 화면 표시용 줄바꿈 (FROM·JOIN·WHERE·AND·ORDER BY 앞에서). 복사해도 그대로 실행되는 SQL이다
-  function prettySql(sql) {
-    return sql.trim().replace(/\s+(FROM|JOIN|WHERE|AND|ORDER BY)\s+/g, "\n$1 ");
-  }
 
   function copyButton(getText) {
     const btn = document.createElement("button");
@@ -128,7 +124,8 @@ SQL 모드: 상품 DB 조회 SQL을 만들어 드려요. 예를 들면
     block.className = "sql-block";
 
     const pre = document.createElement("pre");
-    pre.textContent = prettySql(r.rendered_sql);
+    // 줄바꿈·들여쓰기는 서버(text_to_sql)가 넣어서 보낸다. 받은 그대로 보여 준다
+    pre.textContent = r.rendered_sql;
     const row = document.createElement("div");
     row.className = "row";
     row.appendChild(copyButton(() => pre.textContent));
