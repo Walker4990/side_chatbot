@@ -121,5 +121,24 @@ td.long { min-width: 220px; max-width: 420px; }
 
 @media (max-width: 640px) {
   .user-form { grid-template-columns: 1fr; }
+  header { padding: 10px 12px; }
+  header h1 { font-size: 16px; }
   header nav .btn { padding: 6px 10px; }
+
+  /* 16px 미만이면 아이폰이 입력할 때 화면을 확대한다 */
+  input, select { font-size: 16px; }
+
+  /* 채팅: 답변(특히 SQL)은 화면 폭을 다 쓴다 */
+  #log { padding: 12px; }
+  .msg.me { max-width: 88%; }
+  .msg.bot { max-width: 100%; }
+  .sql-block pre { font-size: 12px; padding: 8px 10px; }
+
+  /* 입력줄: 모드 토글은 윗줄 전체, 아랫줄은 입력칸 + 보내기 */
+  .chat-form {
+    flex-wrap: wrap; padding: 8px 12px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .mode-toggle { width: 100%; }
+  .mode-toggle button { flex: 1; padding: 8px 0; }
 }
