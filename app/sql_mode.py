@@ -5,7 +5,7 @@
 - 결과는 문서 질문과 같은 history 테이블에 mode='sql'로 저장한다
 - 오류 매핑: LLM 서버 불가 → 502, 검증기 차단 → 500
 
-text_to_sql 패키지: https://github.com/Walker4990/text-to-sql (로컬 개발은 pip install -e 경로)
+text_to_sql 패키지는 pip install -e 로 설치해 쓴다.
 """
 
 import logging

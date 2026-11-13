@@ -40,9 +40,6 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)
     return {"id": payload["sub"], "role": payload["role"]}
 
 def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    # 힌트: user["role"]이 "admin"이 아니면
-    #       raise HTTPException(status_code=403, detail="관리자만 사용할 수 있습니다.")
-    # 힌트: 맞으면 user를 그대로 return
     if user["role"] != "admin" :
         raise HTTPException(status_code=403, detail="관리자만 사용할 수 있습니다.")
     return user
